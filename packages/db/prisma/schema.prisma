@@ -1,0 +1,698 @@
+// ResolveAI database schema.
+// Multi-tenant: every tenant is a `Store`. All domain rows carry `storeId`.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "fullTextSearch"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [pgvector(map: "vector"), pg_trgm]
+}
+
+// ─────────────────────────────────────────────────────────────
+// Tenancy
+// ─────────────────────────────────────────────────────────────
+
+enum Platform {
+  SHOPIFY
+  WOOCOMMERCE
+  STANDALONE
+}
+
+enum SubscriptionTier {
+  FREE
+  STARTER
+  GROWTH
+  SCALE
+}
+
+model Store {
+  id              String           @id @default(cuid())
+  clerkOrgId      String?          @unique
+  name            String
+  domain          String           @unique
+  platform        Platform         @default(STANDALONE)
+  timezone        String           @default("UTC")
+  locale          String           @default("en-US")
+  subscriptionTier SubscriptionTier @default(FREE)
+  isActive        Boolean          @default(true)
+  settings        Json             @default("{}")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  users        User[]
+  integrations Integration[]
+  tickets      Ticket[]
+  orders       Order[]
+  customers    Customer[]
+  rules        Rule[]
+  faqDocs      FAQDoc[]
+  auditLogs    AuditLog[]
+  actions      Action[]
+  aiCallLogs   AICallLog[]
+  policy       StorePolicy?
+  subscription Subscription?
+
+  @@index([platform])
+  @@index([isActive])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Store policy (Phase 2 rules engine)
+// ─────────────────────────────────────────────────────────────
+
+/// Stores the canonical, versioned auto-resolution policy for a single store.
+/// We keep a denormalized `policy` JSON blob (validated by zod at write time)
+/// alongside an integer `version` that we bump on every change. The full
+/// version history is preserved in `StorePolicyRevision`.
+model StorePolicy {
+  storeId   String   @id
+  policy    Json
+  version   Int      @default(1)
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  store     Store                 @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  revisions StorePolicyRevision[]
+}
+
+model StorePolicyRevision {
+  id         String   @id @default(cuid())
+  storeId    String
+  version    Int
+  policy     Json
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+
+  storePolicy StorePolicy @relation(fields: [storeId], references: [storeId], onDelete: Cascade)
+
+  @@unique([storeId, version])
+  @@index([storeId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Billing (Stripe)
+// ─────────────────────────────────────────────────────────────
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  PAUSED
+}
+
+enum LimitEnforcement {
+  /// Block ticket processing past the included quota until next period.
+  HARD
+  /// Continue processing tickets but bill overage at $0.05/ticket.
+  SOFT
+}
+
+model Subscription {
+  id                       String             @id @default(cuid())
+  storeId                  String             @unique
+  /// `FREE` is used for trialing accounts that haven't picked a plan yet.
+  tier                     SubscriptionTier   @default(FREE)
+  status                   SubscriptionStatus @default(TRIALING)
+  /// Stripe ids; nullable until the merchant runs Checkout.
+  stripeCustomerId         String?            @unique
+  stripeSubscriptionId     String?            @unique
+  stripePriceId            String?
+  stripeMeterId            String?
+  /// Tickets included in the plan per billing period.
+  includedTickets          Int                @default(0)
+  /// Tickets used in the current period (counter, reset on period roll).
+  ticketsUsedCurrentPeriod Int                @default(0)
+  /// $/ticket overage rate, in micro-USD (50_000 = $0.05).
+  overageMicroUsd          BigInt             @default(50000)
+  /// HARD blocks past the limit; SOFT keeps running and bills overage.
+  enforcement              LimitEnforcement   @default(SOFT)
+  trialEndsAt              DateTime?
+  currentPeriodStart       DateTime?
+  currentPeriodEnd         DateTime?
+  cancelAt                 DateTime?
+  canceledAt               DateTime?
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+/// Per-ticket usage record. Aggregated nightly, but kept individually
+/// so we can replay metered events to Stripe and audit usage disputes.
+model UsageEvent {
+  id              String   @id @default(cuid())
+  storeId         String
+  /// Idempotency key (e.g. ticketId) — guarantees we count each ticket once.
+  idempotencyKey  String
+  /// Event kind. Today only `tickets_processed`, but reserved for future
+  /// metered SKUs (e.g. `ai_calls`, `chat_minutes`).
+  kind            String   @default("tickets_processed")
+  quantity        Int      @default(1)
+  occurredAt      DateTime @default(now())
+  /// Filled in when we ship the event to Stripe.
+  reportedAt      DateTime?
+  reportedEventId String?
+
+  @@unique([storeId, idempotencyKey, kind])
+  @@index([storeId, kind, occurredAt])
+  @@index([reportedAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Users (synced from Clerk)
+// ─────────────────────────────────────────────────────────────
+
+enum UserRole {
+  OWNER
+  ADMIN
+  AGENT
+  VIEWER
+  /// Internal ResolveAI staff. Granted access to /admin via the plugin.
+  SUPER_ADMIN
+}
+
+model User {
+  id          String   @id @default(cuid())
+  clerkUserId String   @unique
+  storeId     String
+  email       String
+  firstName   String?
+  lastName    String?
+  imageUrl    String?
+  role        UserRole @default(AGENT)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store        Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  assignedTickets Ticket[] @relation("AssignedUser")
+  auditLogs    AuditLog[]
+
+  @@unique([storeId, email])
+  @@index([storeId])
+  @@index([role])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Integrations (per-store credentials for external systems)
+// ─────────────────────────────────────────────────────────────
+
+enum IntegrationKind {
+  SHOPIFY
+  WOOCOMMERCE
+  EMAIL_IMAP
+  EMAIL_SMTP
+  CHAT_WIDGET
+  SLACK
+  WEBHOOK
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  PAUSED
+  ERROR
+  DISCONNECTED
+}
+
+model Integration {
+  id            String            @id @default(cuid())
+  storeId       String
+  kind          IntegrationKind
+  status        IntegrationStatus @default(ACTIVE)
+  /// Encrypted at rest at the application layer (AES-256-GCM).
+  /// Shape: { iv, tag, ciphertext } base64. See @resolveai/shared/crypto.
+  credentials   Json
+  config        Json              @default("{}")
+  /// Free-form cursor: e.g. last IMAP UID seen, last Shopify webhook delivery id.
+  cursor        Json              @default("{}")
+  scopes        String[]          @default([])
+  lastSyncAt    DateTime?
+  lastErrorAt   DateTime?
+  lastError     String?
+  externalId    String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, kind, externalId])
+  @@index([storeId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Customers + Orders (mirrored from Shopify/Woo)
+// ─────────────────────────────────────────────────────────────
+
+model Customer {
+  id           String   @id @default(cuid())
+  storeId      String
+  externalId   String?
+  email        String?
+  phone        String?
+  firstName    String?
+  lastName     String?
+  totalSpent   Decimal  @default(0) @db.Decimal(12, 2)
+  ordersCount  Int      @default(0)
+  tags         String[] @default([])
+  metadata     Json     @default("{}")
+  /// Phase 2 fraud / abuse guards.
+  riskFlags          String[] @default([])
+  refundCount30d     Int      @default(0)
+  refundTotal30dUsd  Decimal  @default(0) @db.Decimal(12, 2)
+  lifetimeValueUsd   Decimal  @default(0) @db.Decimal(12, 2)
+  disputeCount       Int      @default(0)
+  riskRecomputedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  store   Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orders  Order[]
+  tickets Ticket[]
+
+  @@unique([storeId, externalId])
+  @@unique([storeId, email])
+  @@index([storeId])
+  @@index([storeId, riskFlags])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FULFILLED
+  PARTIALLY_FULFILLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  CANCELLED
+  RETURNED
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  storeId         String
+  customerId      String?
+  externalId      String
+  externalNumber  String?
+  status          OrderStatus @default(PENDING)
+  currency        String      @default("USD")
+  totalPrice      Decimal     @db.Decimal(12, 2)
+  subtotalPrice   Decimal     @db.Decimal(12, 2)
+  taxPrice        Decimal     @default(0) @db.Decimal(12, 2)
+  shippingPrice   Decimal     @default(0) @db.Decimal(12, 2)
+  refundedAmount  Decimal     @default(0) @db.Decimal(12, 2)
+  trackingNumber  String?
+  trackingUrl     String?
+  lineItems       Json        @default("[]")
+  shippingAddress Json?
+  billingAddress  Json?
+  metadata        Json        @default("{}")
+  placedAt        DateTime?
+  fulfilledAt     DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id])
+  tickets  Ticket[]
+  actions  Action[]
+
+  @@unique([storeId, externalId])
+  @@index([storeId, status])
+  @@index([storeId, customerId])
+  @@index([placedAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Tickets + Messages (the conversation)
+// ─────────────────────────────────────────────────────────────
+
+enum TicketChannel {
+  EMAIL
+  CHAT
+  SHOPIFY_INBOX
+  WHATSAPP
+  API
+}
+
+enum TicketStatus {
+  NEW
+  IN_PROGRESS
+  AWAITING_CUSTOMER
+  AWAITING_HUMAN
+  RESOLVED
+  CLOSED
+}
+
+enum TicketIntent {
+  REFUND
+  REPLACEMENT
+  ORDER_STATUS
+  WRONG_ITEM
+  CHANGE_ADDRESS
+  CANCEL_ORDER
+  COMPLAINT
+  PRODUCT_QUESTION
+  GENERAL
+  OTHER
+  SPAM
+  UNKNOWN
+}
+
+enum TicketUrgency {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TicketSentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+  ANGRY
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model Ticket {
+  id                String          @id @default(cuid())
+  storeId           String
+  customerId        String?
+  orderId           String?
+  assignedUserId    String?
+  channel           TicketChannel
+  status            TicketStatus    @default(NEW)
+  intent            TicketIntent    @default(UNKNOWN)
+  intentConfidence  Float?
+  urgency           TicketUrgency   @default(MEDIUM)
+  sentiment         TicketSentiment @default(NEUTRAL)
+  priority          TicketPriority  @default(NORMAL)
+  proposedActionId  String?         @unique
+  subject           String?
+  language          String          @default("en")
+  externalId        String?
+  externalThreadId  String?
+  autoResolved      Boolean         @default(false)
+  resolvedAt        DateTime?
+  firstResponseAt   DateTime?
+  metadata          Json            @default("{}")
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  store           Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer        Customer?  @relation(fields: [customerId], references: [id])
+  order           Order?     @relation(fields: [orderId], references: [id])
+  assignedUser    User?      @relation("AssignedUser", fields: [assignedUserId], references: [id])
+  proposedAction  Action?    @relation("ProposedAction", fields: [proposedActionId], references: [id])
+  messages        Message[]
+  actions         Action[]
+  auditLogs       AuditLog[]
+  aiCallLogs      AICallLog[]
+
+  @@unique([storeId, channel, externalId])
+  @@index([storeId, status])
+  @@index([storeId, intent])
+  @@index([storeId, priority])
+  @@index([createdAt])
+}
+
+enum MessageRole {
+  CUSTOMER
+  AGENT
+  AI
+  SYSTEM
+}
+
+model Message {
+  id           String      @id @default(cuid())
+  ticketId     String
+  role         MessageRole
+  authorName   String?
+  authorEmail  String?
+  body         String      @db.Text
+  bodyHtml     String?     @db.Text
+  attachments  Json        @default("[]")
+  /// LLM call metadata (model, tokens, cost) when role = AI.
+  llmMeta      Json?
+  externalId   String?
+  /// Phase 2 GDPR retention: soft-delete timestamp. Body fields are
+  /// scrubbed when the retention job runs; the row itself is kept so
+  /// audit history (counts, latencies) remains intact.
+  deletedAt    DateTime?
+  createdAt    DateTime    @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@index([role])
+  @@index([deletedAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Actions (refund / replacement / escalation execution log)
+// ─────────────────────────────────────────────────────────────
+
+enum ActionKind {
+  REFUND_FULL
+  REFUND_PARTIAL
+  REPLACEMENT
+  CANCEL_ORDER
+  UPDATE_ADDRESS
+  RESEND_TRACKING
+  ESCALATE_HUMAN
+  REPLY
+  TAG_CUSTOMER
+  CLOSE_TICKET
+}
+
+enum ActionStatus {
+  PROPOSED
+  PENDING_APPROVAL
+  APPROVED
+  EXECUTING
+  EXECUTED
+  FAILED
+  REJECTED
+  CANCELLED
+}
+
+model Action {
+  id              String       @id @default(cuid())
+  storeId         String
+  ticketId        String
+  orderId         String?
+  kind            ActionKind
+  status          ActionStatus @default(PROPOSED)
+  /// Structured arguments validated by zod before execution (amount, reason, …).
+  payload         Json
+  reasoning       String?      @db.Text
+  /// External provider response (Shopify refund id, etc).
+  result          Json?
+  error           String?
+  /// Stable key used to dedupe outbound mutations (e.g. Shopify refund creation).
+  idempotencyKey  String?      @unique
+  /// Computed eligibility for the action (e.g. refund eligibility); null = not yet computed.
+  eligibility     Json?
+  /// Suggested user-facing reply body that pairs with this action (refund draft, etc.).
+  draftReply      String?      @db.Text
+  proposedById    String?
+  approvedById    String?
+  executedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  ticket          Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  order           Order?   @relation(fields: [orderId], references: [id])
+  proposedFor     Ticket?  @relation("ProposedAction")
+
+  @@index([storeId, status])
+  @@index([ticketId])
+  @@index([kind])
+}
+
+/// Per-call ledger of every LLM invocation.
+/// Cost is stored in micro-USD (10^-6) to avoid floats.
+model AICallLog {
+  id             String   @id @default(cuid())
+  storeId        String
+  ticketId       String?
+  /// e.g. "intent.classify" or "orderStatus.draft"
+  operation      String
+  model          String
+  promptVersion  String
+  promptTokens   Int      @default(0)
+  completionTokens Int    @default(0)
+  totalTokens    Int      @default(0)
+  costMicroUsd   BigInt   @default(0)
+  latencyMs      Int      @default(0)
+  status         String   @default("success") // success | error
+  errorMessage   String?  @db.Text
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  store  Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  ticket Ticket?  @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, createdAt])
+  @@index([operation])
+  @@index([ticketId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Rules (per-store auto-resolution policy)
+// ─────────────────────────────────────────────────────────────
+
+model Rule {
+  id          String   @id @default(cuid())
+  storeId     String
+  name        String
+  description String?
+  /// JSON-logic-style condition tree. Validated by zod at write time.
+  condition   Json
+  /// Action to apply when condition matches (kind + payload template).
+  action      Json
+  priority    Int      @default(100)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, name])
+  @@index([storeId, isActive, priority])
+}
+
+// ─────────────────────────────────────────────────────────────
+// FAQ + RAG
+// ─────────────────────────────────────────────────────────────
+
+enum FAQSource {
+  MANUAL
+  HELPDOC_URL
+  PAST_TICKET
+  POLICY_DOC
+}
+
+model FAQDoc {
+  id        String    @id @default(cuid())
+  storeId   String
+  source    FAQSource @default(MANUAL)
+  title     String
+  url       String?
+  body      String    @db.Text
+  tags      String[]  @default([])
+  isActive  Boolean   @default(true)
+  metadata  Json      @default("{}")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  store      Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  embeddings Embedding[]
+
+  @@index([storeId, isActive])
+}
+
+enum EmbeddingOwner {
+  FAQ_DOC
+  TICKET
+  MESSAGE
+  PRODUCT
+}
+
+/// Vector embeddings for hybrid retrieval (pgvector).
+/// We keep a polymorphic association so we can index FAQs, past tickets, products.
+model Embedding {
+  id          String         @id @default(cuid())
+  storeId     String
+  ownerKind   EmbeddingOwner
+  ownerId     String
+  faqDocId    String?
+  /// 1536-dim for text-embedding-3-small. Adjust if you change the model.
+  vector      Unsupported("vector(1536)")
+  content     String         @db.Text
+  contentHash String
+  metadata    Json           @default("{}")
+  createdAt   DateTime       @default(now())
+
+  faqDoc FAQDoc? @relation(fields: [faqDocId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, ownerKind, ownerId, contentHash])
+  @@index([storeId, ownerKind])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Audit log (write-once)
+// ─────────────────────────────────────────────────────────────
+
+enum AuditEventKind {
+  TICKET_CREATED
+  TICKET_CLASSIFIED
+  TICKET_AUTO_RESOLVED
+  TICKET_ESCALATED
+  TICKET_ASSIGNED
+  ACTION_PROPOSED
+  ACTION_APPROVED
+  ACTION_AUTO_APPROVED
+  ACTION_REJECTED
+  ACTION_EXECUTED
+  ACTION_FAILED
+  AUTO_REFUND_COMPLETED
+  POLICY_DECISION
+  POLICY_UPDATED
+  FRAUD_FLAG_ADDED
+  FRAUD_FLAG_REMOVED
+  MESSAGE_SENT
+  AI_CALL
+  RULE_MATCHED
+  INTEGRATION_CONNECTED
+  INTEGRATION_DISCONNECTED
+  USER_LOGIN
+  WEBHOOK_RECEIVED
+  WEBHOOK_FAILED
+  CHAT_HANDOFF
+  BILLING_SUBSCRIPTION_CREATED
+  BILLING_SUBSCRIPTION_UPDATED
+  BILLING_SUBSCRIPTION_CANCELED
+  BILLING_USAGE_REPORTED
+  BILLING_PLAN_LIMIT_REACHED
+}
+
+model AuditLog {
+  id        String         @id @default(cuid())
+  storeId   String
+  ticketId  String?
+  userId    String?
+  kind      AuditEventKind
+  /// Free-form, but we recommend zod-typed payloads in @resolveai/shared.
+  payload   Json           @default("{}")
+  ip        String?
+  userAgent String?
+  createdAt DateTime       @default(now())
+
+  /// SOC2-style tamper-evident hash chain. `digest` is the HMAC of this row's
+  /// canonical content concatenated with `prevDigest` from the previous row
+  /// for the same store. Populated by `appendAuditLog` in `apps/api/src/lib`.
+  digest     String?
+  prevDigest String?
+
+  store  Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  ticket Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, kind, createdAt])
+  @@index([ticketId])
+}

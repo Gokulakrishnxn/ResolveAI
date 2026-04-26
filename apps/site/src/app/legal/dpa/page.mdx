@@ -1,0 +1,54 @@
+export const metadata = {
+  title: 'Data Processing Addendum',
+};
+
+# Data Processing Addendum
+
+_Last updated: April 27, 2026_
+
+This DPA forms part of the agreement between ResolveAI, Inc. (&quot;Processor&quot;) and the merchant (&quot;Controller&quot;) using the ResolveAI platform.
+
+## 1. Roles
+
+Controller determines purposes and means of processing. Processor processes personal data on Controller&apos;s behalf.
+
+## 2. Subject matter and duration
+
+Processing personal data of Controller&apos;s end customers (names, emails, message bodies, order references) for the purpose of automated customer support. Duration matches the underlying subscription.
+
+## 3. Categories of data subjects
+
+End customers of the merchant.
+
+## 4. Sub-processors
+
+- OpenAI (LLM inference, US)
+- Stripe (billing, US)
+- AWS (infrastructure, US/EU)
+- Sentry (error monitoring, US)
+- PostHog (product analytics, US — disabled on request)
+
+Controller is notified of new sub-processors with at least 30 days&apos; notice and may object.
+
+## 5. Security measures
+
+- Encryption in transit (TLS 1.2+) and at rest (AES-256).
+- Per-tenant logical isolation, AES-256-GCM-wrapped integration credentials.
+- Tamper-evident audit log signing.
+- SOC2 Type II audit underway; controls available on request.
+
+## 6. International transfers
+
+Standard Contractual Clauses are executed for data transfers between EU and US entities.
+
+## 7. Sub-processor list and updates
+
+Available at https://resolveai.app/security#sub-processors. Updated whenever the list changes.
+
+## 8. Data subject rights
+
+Processor will assist Controller in responding to data subject requests (access, deletion, portability) within 30 days.
+
+## 9. Contact
+
+dpo@resolveai.app

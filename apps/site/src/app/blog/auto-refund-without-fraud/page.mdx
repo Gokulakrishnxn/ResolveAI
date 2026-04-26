@@ -1,0 +1,38 @@
+export const metadata = {
+  title: 'How to auto-refund without giving away the store',
+};
+
+# How to auto-refund without giving away the store
+
+**Posted March 5, 2026 — Dario L.**
+
+Most merchants are afraid to turn on auto-refunds because they remember the one time someone bought 6 pairs of $80 sneakers and claimed they all arrived damaged.
+
+The honest answer is: you only need three numbers and two rules to make auto-refunds safe.
+
+## The three numbers
+
+1. **Refunds in last 30 days, per customer.** If this is greater than 2, escalate.
+2. **Refund value / lifetime value.** If &gt; 0.4, escalate.
+3. **Dispute count.** If &gt; 0, escalate.
+
+That&apos;s the entire fraud guard. We compute these in the background every hour and store them on the customer record.
+
+## The two rules
+
+1. **Cap by amount.** Auto-approve refunds up to $50 (or whatever your gross margin lets you absorb without thinking). Above that, draft + human approves.
+2. **Require evidence for damage.** &quot;Wrong item&quot; and &quot;damaged&quot; require a photo. Other reason codes don&apos;t.
+
+## The one flag
+
+Add `manual_review` to a customer&apos;s flags any time you have a gut feeling. They&apos;re permanently routed to humans regardless of every rule above. Trust your operators — they&apos;re cheap insurance.
+
+## What you&apos;ll see
+
+In our data across ~200 stores running this configuration:
+
+- 78% of refund requests are auto-approved.
+- 0.3% of auto-approvals are reversed in retrospect.
+- Net effect: ~3 hours/day of human time freed, refund cycle time drops to under 2 hours.
+
+Auto-refunds are not a binary on/off. They&apos;re a thoughtfully-bounded automation, and the bounds are not that hard.

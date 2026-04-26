@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  background: #ffffff;
+  color: #0b0b14;
+}
+
+/* Marketing prose styles for MDX blog posts. */
+.prose {
+  max-width: 65ch;
+  line-height: 1.7;
+}
+.prose h1,
+.prose h2,
+.prose h3 {
+  font-weight: 700;
+  line-height: 1.25;
+  margin-top: 2em;
+  margin-bottom: 0.5em;
+}
+.prose p {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+.prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #f3f4f6;
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.prose a {
+  color: #5046E5;
+  text-decoration: underline;
+}

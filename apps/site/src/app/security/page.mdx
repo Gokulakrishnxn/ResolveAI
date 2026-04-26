@@ -1,0 +1,45 @@
+export const metadata = {
+  title: 'Security at ResolveAI',
+};
+
+# Security at ResolveAI
+
+We treat customer support data with the same care a bank treats account data. Here&apos;s the short version.
+
+## In transit
+
+All traffic uses TLS 1.2 or newer. HSTS is enforced.
+
+## At rest
+
+- Postgres encrypted with AES-256 at the disk layer.
+- All third-party integration credentials (Shopify, IMAP/SMTP, WhatsApp, Stripe customer ids) are wrapped with AES-256-GCM using a key managed in AWS KMS.
+
+## Tenant isolation
+
+Every row in every table carries a `storeId`. We use prepared queries with the storeId always as the first predicate, and our test suite includes cross-tenant access tests on every PR.
+
+## Audit log
+
+Every automated decision (classifications, auto-refunds, handoffs, billing events) is appended to a tamper-evident audit log signed with HMAC-SHA256. Replays and tampering are detectable.
+
+## Backups
+
+Nightly full Postgres dumps to S3 with 30-day retention. Quarterly restore drills.
+
+## Access
+
+- Production access is gated by SSO + MFA.
+- Engineers do not see customer message contents in logs (PII scrubbing happens at log emit).
+
+## Vulnerability reporting
+
+security@resolveai.app — we triage within one business day. We don&apos;t pay bounties yet but we will name you in the changelog if you want.
+
+## SOC2
+
+SOC2 Type II audit underway. Letter of attestation available on request once issued.
+
+## Sub-processors
+
+See the [DPA](/legal/dpa#4-sub-processors).
