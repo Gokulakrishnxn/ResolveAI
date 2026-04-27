@@ -1,7 +1,17 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, ExternalLink, Sparkles } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface Subscription {
   tier: string;
@@ -107,132 +117,201 @@ export function BillingPanel({
   const used = subscription?.ticketsUsedCurrentPeriod ?? 0;
   const included = subscription?.includedTickets ?? 0;
   const usagePct = included ? Math.min(100, Math.round((used / included) * 100)) : 0;
+  const usageTone =
+    usagePct >= 100 ? 'bg-rose-500' : usagePct >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
 
   return (
-    <div className="space-y-8">
-      {error && (
-        <div className="rounded-md border border-red-500/40 bg-red-500/5 p-3 text-sm text-red-600">
+    <div className="space-y-6">
+      {error ? (
+        <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
           {error}
         </div>
-      )}
+      ) : null}
 
-      <section className="rounded-lg border bg-card p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold">Current plan</h2>
-            <p className="text-sm text-muted-foreground">
-              {subscription
-                ? `${subscription.tier} — ${subscription.status}`
-                : 'No subscription yet — start a trial below.'}
-            </p>
+      {/* Current plan */}
+      <Card>
+        <CardHeader className="border-b border-border/60 pb-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle>Current plan</CardTitle>
+              <CardDescription>
+                {subscription
+                  ? 'Your active ResolveAI subscription and quota.'
+                  : 'No subscription yet — start your 14-day trial below, no card required.'}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              {subscription ? (
+                <>
+                  <Badge variant="outline" className="h-6 px-2 capitalize">
+                    {subscription.status.toLowerCase()}
+                  </Badge>
+                  <Badge variant="secondary" className="h-6 px-2">
+                    {subscription.tier}
+                  </Badge>
+                </>
+              ) : null}
+              {subscription?.stripeCustomerId ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={pending}
+                  onClick={openPortal}
+                >
+                  Manage in Stripe
+                  <ExternalLink className="size-3.5" />
+                </Button>
+              ) : null}
+            </div>
           </div>
-          {subscription?.stripeCustomerId && (
-            <button
-              type="button"
-              onClick={openPortal}
-              disabled={pending}
-              className="rounded-md border px-3 py-1.5 text-sm"
-            >
-              Manage in Stripe
-            </button>
-          )}
-        </div>
-        {subscription && (
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            <Stat
-              label="Tickets used this period"
-              value={`${used.toLocaleString()} / ${included.toLocaleString()}`}
-            />
-            <Stat
-              label="Trial ends"
-              value={subscription.trialEndsAt ? formatDate(subscription.trialEndsAt) : '—'}
-            />
-            <Stat
-              label="Renews"
-              value={
-                subscription.currentPeriodEnd ? formatDate(subscription.currentPeriodEnd) : '—'
-              }
-            />
-          </div>
-        )}
-        {subscription && (
-          <div className="mt-4">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full bg-primary transition-all"
-                style={{ width: `${usagePct}%` }}
+        </CardHeader>
+
+        {subscription ? (
+          <CardContent className="space-y-6 pt-5">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Stat
+                label="Tickets this period"
+                value={`${used.toLocaleString()} / ${included.toLocaleString()}`}
+              />
+              <Stat
+                label="Trial ends"
+                value={subscription.trialEndsAt ? formatDate(subscription.trialEndsAt) : '—'}
+              />
+              <Stat
+                label="Renews"
+                value={
+                  subscription.currentPeriodEnd ? formatDate(subscription.currentPeriodEnd) : '—'
+                }
               />
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">{usagePct}% of included quota used</p>
-          </div>
-        )}
-        {subscription && (
-          <div className="mt-6 rounded-md border bg-muted/40 p-4">
-            <p className="text-sm font-medium">Plan limit behaviour</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              <strong>Hard</strong> blocks ticket processing past the included quota until the
-              next billing period. <strong>Soft</strong> keeps processing and bills overage at
-              $0.05/ticket.
-            </p>
-            <div className="mt-3 inline-flex rounded-md border bg-background p-1 text-xs">
-              {(['SOFT', 'HARD'] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => flipEnforcement(v)}
-                  disabled={pending}
-                  className={`rounded px-3 py-1 font-medium ${
-                    enforcement === v ? 'bg-primary text-primary-foreground' : ''
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
 
-      <section>
-        <h2 className="mb-4 text-xl font-semibold">Plans</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {plans.plans.map((plan) => (
-            <div key={plan.tier} className="rounded-lg border bg-card p-6">
-              <div className="flex items-baseline justify-between">
-                <h3 className="text-lg font-semibold">{plan.name}</h3>
-                <span className="text-2xl font-bold">${plan.priceMonthlyUsd}</span>
+            <div className="space-y-2">
+              <div className="flex items-baseline justify-between text-xs">
+                <span className="font-medium text-foreground">Usage</span>
+                <span className="tabular-nums text-muted-foreground">
+                  {usagePct}% of included quota
+                </span>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">/month</p>
-              <p className="mt-3 text-sm text-muted-foreground">{plan.description}</p>
-              <ul className="mt-4 space-y-1 text-sm">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => startCheckout(plan.tier)}
-                className="mt-5 w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-              >
-                {subscription?.tier === plan.tier ? 'Current plan' : 'Choose plan'}
-              </button>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                <div
+                  className={cn('h-full transition-all', usageTone)}
+                  style={{ width: `${usagePct}%` }}
+                />
+              </div>
             </div>
-          ))}
+
+            <div className="rounded-lg border border-border/70 bg-secondary/30 p-4">
+              <p className="text-sm font-medium text-foreground">Plan limit behaviour</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                <strong className="text-foreground">Hard</strong> blocks ticket processing past
+                the included quota until the next period.{' '}
+                <strong className="text-foreground">Soft</strong> keeps processing and bills
+                overage at $0.05/ticket.
+              </p>
+              <div className="mt-3 inline-flex items-center rounded-md border border-border/70 bg-background p-0.5 text-xs">
+                {(['SOFT', 'HARD'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => flipEnforcement(v)}
+                    disabled={pending}
+                    className={cn(
+                      'rounded-[5px] px-3 py-1 font-medium transition-colors',
+                      enforcement === v
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        ) : null}
+      </Card>
+
+      {/* Plans */}
+      <div className="space-y-3">
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">Plans</h2>
+            <p className="text-sm text-muted-foreground">
+              Pay only for the volume you use. {plans.trialDays}-day free trial on every plan.
+            </p>
+          </div>
         </div>
-      </section>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {plans.plans.map((plan) => {
+            const current = subscription?.tier === plan.tier;
+            const featured = plan.tier === 'GROWTH';
+            return (
+              <Card
+                key={plan.tier}
+                className={cn(
+                  'relative transition-colors',
+                  featured && 'border-foreground/40 ring-1 ring-foreground/10',
+                )}
+              >
+                {featured ? (
+                  <div className="absolute right-4 top-4">
+                    <Badge variant="default" className="gap-1">
+                      <Sparkles className="size-3" />
+                      Most popular
+                    </Badge>
+                  </div>
+                ) : null}
+                <CardHeader>
+                  <CardTitle className="text-base">{plan.name}</CardTitle>
+                  <CardDescription>{plan.description}</CardDescription>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+                      ${plan.priceMonthlyUsd}
+                    </span>
+                    <span className="text-xs text-muted-foreground">/month</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Includes {plan.includedTickets.toLocaleString()} tickets/mo
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <ul className="space-y-2 text-sm">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-foreground/85">
+                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-foreground/70" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    type="button"
+                    disabled={pending || current}
+                    onClick={() => startCheckout(plan.tier)}
+                    variant={featured ? 'default' : 'outline'}
+                    className="w-full"
+                  >
+                    {current ? 'Current plan' : 'Choose plan'}
+                    {!current ? <ArrowUpRight className="size-4" /> : null}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <div className="rounded-md border bg-background p-4">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-lg font-semibold">{value}</p>
+    <div className="rounded-lg border border-border/70 bg-background/40 px-4 py-3">
+      <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 text-base font-semibold tabular-nums text-foreground">{value}</p>
     </div>
   );
 }

@@ -5,91 +5,76 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-interface TimeseriesPoint {
-  day: string;
-  total: number;
-  autoResolved: number;
-}
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 interface IntentRow {
   intent: string;
   count: number;
 }
 
-const INTENT_COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#65a30d'];
+const INTENT_COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+];
 
-export function AnalyticsCharts({
-  series,
-  intents,
-}: {
-  series: TimeseriesPoint[];
-  intents: IntentRow[];
-}): JSX.Element {
+export function AnalyticsCharts({ intents }: { intents: IntentRow[] }): JSX.Element {
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Tickets per day</CardTitle>
-        </CardHeader>
-        <CardContent className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={series}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="total"
-                stroke="#2563eb"
-                strokeWidth={2}
-                dot={false}
-                name="Total"
-              />
-              <Line
-                type="monotone"
-                dataKey="autoResolved"
-                stroke="#16a34a"
-                strokeWidth={2}
-                dot={false}
-                name="Auto-resolved"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Tickets by intent</CardTitle>
-        </CardHeader>
-        <CardContent className="h-72">
+    <Card className="@container/card">
+      <CardHeader>
+        <CardTitle className="text-base">Tickets by intent</CardTitle>
+      </CardHeader>
+      <CardContent className="h-72 px-2 sm:px-6">
+        {intents.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+            No intent breakdown yet.
+          </div>
+        ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={intents}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="intent" tick={{ fontSize: 11 }} interval={0} angle={-20} dy={8} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Bar dataKey="count">
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} />
+              <XAxis
+                dataKey="intent"
+                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                axisLine={{ stroke: 'hsl(var(--border))' }}
+                tickLine={false}
+                interval={0}
+                angle={-20}
+                dy={8}
+              />
+              <YAxis
+                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                axisLine={{ stroke: 'hsl(var(--border))' }}
+                tickLine={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: 'hsl(var(--popover))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: 8,
+                  color: 'hsl(var(--popover-foreground))',
+                  fontSize: 12,
+                }}
+                cursor={{ fill: 'hsl(var(--accent))', opacity: 0.4 }}
+              />
+              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                 {intents.map((_, i) => (
                   <Cell key={i} fill={INTENT_COLORS[i % INTENT_COLORS.length]} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

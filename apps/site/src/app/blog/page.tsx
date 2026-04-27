@@ -24,29 +24,37 @@ const posts = [
 
 export default function BlogIndexPage(): JSX.Element {
   return (
-    <section className="mx-auto max-w-3xl px-6 py-20">
-      <h1 className="text-4xl font-semibold tracking-tight">Blog</h1>
-      <p className="mt-3 text-zinc-600">
-        Notes from the team on AI customer support, e-commerce ops, and what we&apos;re building.
+    <section className="container-marketing max-w-3xl py-20 sm:py-24">
+      <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-sky-400/90">
+        Blog
       </p>
-      <div className="mt-10 divide-y divide-zinc-200 border-y border-zinc-200">
+      <h1 className="mt-3 text-display-lg font-semibold text-text-primary">
+        Notes from the team
+      </h1>
+      <p className="mt-3 text-[15px] leading-relaxed text-text-secondary sm:text-base">
+        AI customer support, e-commerce ops, and what we&apos;re building.
+      </p>
+      <div className="mt-12 divide-y divide-line border-y border-line">
         {posts.map((p) => (
           <Link
             key={p.slug}
             href={`/blog/${p.slug}`}
-            className="flex flex-col gap-1 py-6 transition hover:opacity-80"
+            className="group flex flex-col gap-1.5 py-7 transition-colors hover:text-text-primary"
           >
-            <span className="text-xs uppercase tracking-widest text-zinc-500">
+            <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-text-tertiary">
               {new Date(p.date).toLocaleDateString(undefined, {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
               })}
             </span>
-            <h2 className="text-2xl font-semibold">{p.title}</h2>
-            <p className="text-zinc-600">{p.excerpt}</p>
-            <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-accent">
-              Read article <ArrowRight className="h-4 w-4" />
+            <h2 className="text-2xl font-semibold tracking-tight text-text-primary">
+              {p.title}
+            </h2>
+            <p className="text-[15px] text-text-secondary">{p.excerpt}</p>
+            <span className="mt-1 inline-flex items-center gap-1 text-[13px] font-medium text-sky-300">
+              Read article
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </span>
           </Link>
         ))}

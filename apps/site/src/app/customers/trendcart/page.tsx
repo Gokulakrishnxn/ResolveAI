@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
+import { ROUTES } from '@/components/marketing/theme';
 
 export const metadata = {
   title: 'TrendCart — Customer story',
@@ -6,19 +8,19 @@ export const metadata = {
 
 export default function TrendCartCaseStudyPage(): JSX.Element {
   return (
-    <article className="mx-auto max-w-3xl px-6 py-20">
-      <p className="text-xs font-semibold uppercase tracking-widest text-accent">
+    <article className="container-marketing max-w-3xl py-20 sm:py-24">
+      <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-sky-400/90">
         Case study · TrendCart
       </p>
-      <h1 className="mt-3 text-4xl font-semibold tracking-tight">
+      <h1 className="mt-3 text-display-lg font-semibold text-text-primary">
         From 14h response time to 6 minutes — without hiring a single new agent.
       </h1>
-      <p className="mt-4 text-zinc-600">
-        How a 40k-customers/month streetwear brand auto-resolved 71% of email tickets in their
-        first week with ResolveAI.
+      <p className="mt-4 text-[15px] leading-relaxed text-text-secondary sm:text-base">
+        How a 40k-customers/month streetwear brand auto-resolved 71% of email tickets in
+        their first week with ResolveAI.
       </p>
 
-      <div className="prose mt-12 text-zinc-800">
+      <div className="prose mt-12">
         <h2>The problem</h2>
         <p>
           Coming out of Black Friday, TrendCart was sitting on 3,500 unanswered tickets. Most of
@@ -35,9 +37,7 @@ export default function TrendCartCaseStudyPage(): JSX.Element {
           ResolveAI installed on a Tuesday. We connected Shopify (read-only token), the Gmail
           inbox, and uploaded their shipping &amp; returns docs.
         </p>
-        <p>
-          We turned on:
-        </p>
+        <p>We turned on:</p>
         <ul>
           <li>Auto-resolve for <code>ORDER_STATUS</code> at confidence ≥ 0.85.</li>
           <li>Refund draft mode (human approves) for the first two weeks.</li>
@@ -63,10 +63,11 @@ export default function TrendCartCaseStudyPage(): JSX.Element {
       </div>
 
       <Link
-        href="https://app.resolveai.app/sign-up"
-        className="mt-12 inline-flex items-center gap-2 rounded-md bg-accent px-5 py-3 text-sm font-medium text-white"
+        href={ROUTES.signUp}
+        className="mt-12 inline-flex items-center gap-2 rounded-full bg-gradient-sky px-5 py-3 text-[13px] font-medium text-canvas shadow-glow transition-transform duration-200 hover:-translate-y-0.5"
       >
         Try it on your store
+        <ArrowRight className="h-4 w-4" />
       </Link>
     </article>
   );

@@ -1,5 +1,8 @@
 'use client';
 
+import { Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 export function ExportCsvButton({ from, to }: { from: string; to: string }): JSX.Element {
@@ -30,12 +33,9 @@ export function ExportCsvButton({ from, to }: { from: string; to: string }): JSX
   };
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent"
-    >
+    <Button type="button" variant="outline" size="default" onClick={onClick} className="h-9">
+      <Download />
       Export CSV
-    </button>
+    </Button>
   );
 }

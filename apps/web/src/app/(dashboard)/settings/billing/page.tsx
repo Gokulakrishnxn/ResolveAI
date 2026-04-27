@@ -1,3 +1,7 @@
+import { CreditCard } from 'lucide-react';
+import { PageHeader } from '@/components/page-header';
+import { SiteHeader } from '@/components/site-header';
+import { Badge } from '@/components/ui/badge';
 import { apiFetch } from '@/lib/api';
 import { getDashboardAuth } from '@/lib/auth';
 import { BillingPanel } from './_components/billing-panel';
@@ -48,14 +52,26 @@ export default async function BillingPage(): Promise<JSX.Element> {
   }
 
   return (
-    <div className="p-8">
-      <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">Billing</h1>
-        <p className="text-muted-foreground">
-          Manage your plan, see usage, and update your payment method.
-        </p>
-      </header>
-      <BillingPanel subscription={subscription} plans={plans} />
-    </div>
+    <>
+      <SiteHeader title="Billing" />
+
+      <PageHeader
+        eyebrow="Billing"
+        title="Plan & usage"
+        description="Manage your plan, see usage and update your payment method."
+        actions={
+          subscription ? (
+            <Badge variant="outline" className="h-7 gap-1.5 px-2.5">
+              <CreditCard className="size-3.5" />
+              {subscription.tier} · {subscription.status.toLowerCase()}
+            </Badge>
+          ) : null
+        }
+      />
+
+      <div className="px-6 py-6 lg:px-10 lg:py-8">
+        <BillingPanel subscription={subscription} plans={plans} />
+      </div>
+    </>
   );
 }

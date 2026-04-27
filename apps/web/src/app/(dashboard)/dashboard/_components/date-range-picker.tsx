@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -30,8 +31,8 @@ export function DateRangePicker({ initialFrom, initialTo }: Props): JSX.Element 
 
   return (
     <div className="flex items-end gap-2">
-      <div>
-        <Label className="text-xs" htmlFor="range-from">
+      <div className="space-y-1">
+        <Label htmlFor="range-from" className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
           From
         </Label>
         <Input
@@ -39,22 +40,30 @@ export function DateRangePicker({ initialFrom, initialTo }: Props): JSX.Element 
           type="date"
           value={from}
           onChange={(e) => setFrom(e.target.value)}
+          className="h-9 w-[150px]"
         />
       </div>
-      <div>
-        <Label className="text-xs" htmlFor="range-to">
+      <div className="space-y-1">
+        <Label htmlFor="range-to" className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
           To
         </Label>
-        <Input id="range-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        <Input
+          id="range-to"
+          type="date"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          className="h-9 w-[150px]"
+        />
       </div>
-      <button
+      <Button
         type="button"
         onClick={apply}
         disabled={isPending}
-        className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+        size="default"
+        className="h-9"
       >
-        {isPending ? 'Loading...' : 'Apply'}
-      </button>
+        {isPending ? 'Loading…' : 'Apply'}
+      </Button>
     </div>
   );
 }

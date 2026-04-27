@@ -1,11 +1,14 @@
 import Link from 'next/link';
+import { Inbox as InboxIcon } from 'lucide-react';
+import { PageHeader } from '@/components/page-header';
+import { SiteHeader } from '@/components/site-header';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { apiFetch } from '@/lib/api';
 import { getDashboardAuth } from '@/lib/auth';
 import type { TicketListItem } from '@/lib/types';
-import { InboxRealtime } from './_components/inbox-realtime';
 import { InboxFilters } from './_components/inbox-filters';
+import { InboxRealtime } from './_components/inbox-realtime';
 
 interface ListResponse {
   items: TicketListItem[];
@@ -13,7 +16,10 @@ interface ListResponse {
   searchMode?: string;
 }
 
-const INTENT_TONE: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'danger' | 'muted' | 'outline'> = {
+const INTENT_TONE: Record<
+  string,
+  'default' | 'secondary' | 'success' | 'warning' | 'danger' | 'muted' | 'outline'
+> = {
   ORDER_STATUS: 'success',
   REFUND: 'warning',
   REPLACEMENT: 'warning',
@@ -71,44 +77,48 @@ export default async function InboxPage({
   }
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="border-b px-8 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Inbox</h1>
-            <p className="text-sm text-muted-foreground">
-              Customer conversations classified and drafted by ResolveAI.
-            </p>
-          </div>
-          <InboxRealtime />
-        </div>
-        <div className="mt-4">
-          <InboxFilters values={searchParams} />
-        </div>
-      </header>
+    <>
+      <SiteHeader title="Inbox" />
 
-      <div className="flex-1 overflow-y-auto px-8 py-6">
+      <PageHeader
+        eyebrow="Conversations"
+        title="Inbox"
+        description="Customer conversations classified and drafted by ResolveAI."
+        actions={<InboxRealtime />}
+      />
+
+      <div className="border-b border-border/60 bg-background/60 px-6 py-4 lg:px-10">
+        <InboxFilters values={searchParams} />
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-6 py-6 lg:px-10 lg:py-8">
         {data.items.length === 0 ? (
-          <Card>
-            <CardContent className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-              No tickets yet. Connect Shopify and email under{' '}
-              <Link href="/integrations" className="ml-1 font-medium underline">
-                Integrations
-              </Link>
-              .
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <div className="flex size-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
+                <InboxIcon className="size-5" />
+              </div>
+              <p className="text-sm font-medium text-foreground">No tickets yet</p>
+              <p className="max-w-xs text-sm text-muted-foreground">
+                Connect Shopify and email under{' '}
+                <Link href="/integrations" className="text-foreground underline underline-offset-4">
+                  Integrations
+                </Link>{' '}
+                to start auto-resolving customer conversations.
+              </p>
             </CardContent>
           </Card>
         ) : (
-          <ul className="divide-y rounded-lg border bg-card">
+          <ul className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
             {data.items.map((t) => (
               <li key={t.id}>
                 <Link
                   href={`/inbox/${t.id}`}
-                  className="flex items-start justify-between gap-4 px-5 py-4 transition-colors hover:bg-accent/40"
+                  className="flex items-start justify-between gap-4 px-5 py-4 transition-colors hover:bg-secondary/40"
                 >
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium">
+                      <span className="truncate text-sm font-medium text-foreground">
                         {t.customer?.email ?? 'Unknown sender'}
                       </span>
                       <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
@@ -127,7 +137,9 @@ export default async function InboxPage({
                     <Badge variant={t.status === 'AWAITING_HUMAN' ? 'warning' : 'muted'}>
                       {t.status.replace('_', ' ')}
                     </Badge>
-                    <span className="w-16 text-right text-muted-foreground">{formatRelative(t.createdAt)}</span>
+                    <span className="w-16 text-right tabular-nums text-muted-foreground">
+                      {formatRelative(t.createdAt)}
+                    </span>
                   </div>
                 </Link>
               </li>
@@ -135,6 +147,6 @@ export default async function InboxPage({
           </ul>
         )}
       </div>
-    </div>
+    </>
   );
 }

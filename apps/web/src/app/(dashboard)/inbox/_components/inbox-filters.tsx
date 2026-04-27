@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useState, useTransition } from 'react';
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -42,6 +43,13 @@ interface InboxFiltersProps {
   };
 }
 
+const SELECT_CLASS =
+  'h-9 w-full appearance-none rounded-md border border-input bg-background px-3 pr-8 text-sm shadow-sm transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 ' +
+  "bg-[url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999692' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>\")] bg-[length:12px_12px] bg-[right_0.6rem_center] bg-no-repeat";
+
+const FIELD_LABEL_CLASS =
+  'text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground';
+
 export function InboxFilters({ values }: InboxFiltersProps): JSX.Element {
   const router = useRouter();
   const params = useSearchParams();
@@ -64,11 +72,13 @@ export function InboxFilters({ values }: InboxFiltersProps): JSX.Element {
 
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-      <div className="space-y-1">
-        <Label htmlFor="filter-channel">Channel</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="filter-channel" className={FIELD_LABEL_CLASS}>
+          Channel
+        </Label>
         <select
           id="filter-channel"
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+          className={SELECT_CLASS}
           value={values.channel ?? ''}
           onChange={(e) => update({ channel: e.target.value })}
         >
@@ -79,11 +89,13 @@ export function InboxFilters({ values }: InboxFiltersProps): JSX.Element {
           ))}
         </select>
       </div>
-      <div className="space-y-1">
-        <Label htmlFor="filter-status">Status</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="filter-status" className={FIELD_LABEL_CLASS}>
+          Status
+        </Label>
         <select
           id="filter-status"
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+          className={SELECT_CLASS}
           value={values.status ?? ''}
           onChange={(e) => update({ status: e.target.value })}
         >
@@ -94,11 +106,13 @@ export function InboxFilters({ values }: InboxFiltersProps): JSX.Element {
           ))}
         </select>
       </div>
-      <div className="space-y-1">
-        <Label htmlFor="filter-intent">Intent</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="filter-intent" className={FIELD_LABEL_CLASS}>
+          Intent
+        </Label>
         <select
           id="filter-intent"
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+          className={SELECT_CLASS}
           value={values.intent ?? ''}
           onChange={(e) => update({ intent: e.target.value })}
         >
@@ -109,21 +123,27 @@ export function InboxFilters({ values }: InboxFiltersProps): JSX.Element {
           ))}
         </select>
       </div>
-      <div className="space-y-1 md:col-span-2">
-        <Label htmlFor="filter-search">Search</Label>
+      <div className="space-y-1.5 md:col-span-2">
+        <Label htmlFor="filter-search" className={FIELD_LABEL_CLASS}>
+          Search
+        </Label>
         <div className="flex gap-2">
-          <Input
-            id="filter-search"
-            placeholder="Order #, name, keyword..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') update({ search });
-            }}
-          />
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
+            <Input
+              id="filter-search"
+              placeholder="Order #, name, keyword…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') update({ search });
+              }}
+              className="pl-8"
+            />
+          </div>
           <select
             aria-label="Search mode"
-            className="rounded-md border bg-background px-3 py-2 text-sm"
+            className={SELECT_CLASS + ' w-[110px] flex-none'}
             value={values.searchMode ?? 'text'}
             onChange={(e) => update({ searchMode: e.target.value })}
           >
@@ -134,7 +154,9 @@ export function InboxFilters({ values }: InboxFiltersProps): JSX.Element {
             ))}
           </select>
         </div>
-        {isPending && <p className="text-xs text-muted-foreground">Updating...</p>}
+        {isPending ? (
+          <p className="text-[11px] text-muted-foreground">Updating…</p>
+        ) : null}
       </div>
     </div>
   );
