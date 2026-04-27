@@ -3,7 +3,6 @@
 > **AI Customer Support Auto-Resolver for Shopify & WooCommerce.**
 > Ingest tickets from email/chat, classify intent, retrieve relevant order + FAQ context, and execute (or escalate) refunds, replacements, and answers — autonomously.
 
-[![CI](https://github.com/your-org/resolveai/actions/workflows/ci.yml/badge.svg)](./.github/workflows/ci.yml)
 
 ---
 
